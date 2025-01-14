@@ -1,64 +1,125 @@
 import express from "express"
 import { middleware } from "./middleware";
-import {CreateUserSchema,SigninSchema,CreateRoomSchema} from "@repo/common/type"
+// import {CreateUserSchema,SigninSchema,CreateRoomSchema} from "@repo/common/type"
 import dotenv from "dotenv"
 dotenv.config()
 const app = express();
 import jwt from "jsonwebtoken"
 import {JWT_SECRET} from "@repo/backend-common/config"
+import { prismaClient } from "@repo/db/client";  
 
 const port = process.env.PORT
+app.use(express.json())
+import {z} from "zod"
 
-app.post("/signup", (req, res) => {
+ const CreateUserSchema = z.object({
+    username : z.string().min(5).max(20),
+    password : z.string(),
+    name : z.string()
+})
+ const SigninSchema = z.object({
+    username : z.string().min(5).max(20),
+    password : z.string(),
 
-    const data = CreateUserSchema.safeParse(req.body);
-    if (!data.success) {
-        res.json({
-            message: "Incorrect inputs"
-        })
-        return;
-    }
-    // db call
-    res.json({
-        userId: "123"
-    })
 })
 
-app.post("/signin", (req, res) => {
-    const data = SigninSchema.safeParse(req.body);
-    if (!data.success) {
+ const CreateRoomSchema = z.object({
+name : z.string().min(5).max(12)
+})
+
+app.post("/signup", async(req, res) => {
+
+    const Safedata = CreateUserSchema.safeParse(req.body);
+    if (!Safedata.success) {
+        console.log(Safedata)
         res.json({
             message: "Incorrect inputs"
         })
         return;
     }
+   try{    
+       const newUser = await prismaClient.user.create({
+        data:{
+            email:Safedata.data?.username,
+            name : Safedata.data.name,
+            password : Safedata.data.password
+        }
+       })
+    res.json({
+        userId : newUser.id
+    })
+}catch(e){
+    res.status(404).json({msg : "User Already exist"})
+}
+})
 
-    const userId = 1;
+app.post("/signin",async (req, res) => {
+    const parsedata = SigninSchema.safeParse(req.body);
+    if (!parsedata.success) {
+        res.json({
+            message: "Incorrect inputs"
+        })
+        return;
+    }
+   try{
+    const user = await prismaClient.user.findFirst({
+        where:{
+            email : parsedata.data.username,
+            password : parsedata.data.password,
+        }
+    })
+    console.log(user);
+    if(!user){
+        res.status(403).json({msg : "user not found"})
+    }
     const token = jwt.sign({
-        userId
+        userId : user?.id
     }, JWT_SECRET);
 
     res.json({
         token
     })
+    
+   }catch(e){
+      res.status(200).json({msg: "invalid credentials"})
+   }
+   
 })
 
-app.post("/room", middleware, (req, res) => {
-    const data = CreateRoomSchema.safeParse(req.body);
-    if (!data.success) {
+app.post("/room", middleware, async (req, res) => {
+    const parsedata = CreateRoomSchema.safeParse(req.body);
+    if (!parsedata.success) {
         res.json({
             message: "Incorrect inputs"
         })
         return;
+        
     }
-    // db call
+    
+    
+    try{
+        const userId = req.userId;
+        const room = await prismaClient.room.create({
+            data : {
+               slug : parsedata.data.name,
+               adminId : userId || ""
 
-    res.json({
-        roomId: 123
+            }
+      })
+   
+       res.json({
+           roomId: room.id
+       })
+    }catch(e){ res.status(411).json({
+        message: "Room already exists with this name"
     })
+
+    }
+
+   
 })
 
-app.listen(3001);
-app.listen(port,()=>{
+
+app.listen(3001,()=>{
     console.log("port listing http");
 })
