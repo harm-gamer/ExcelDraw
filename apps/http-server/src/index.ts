@@ -156,6 +156,6 @@ app.get("/room/:slug",async (req,res) =>{
         room
     })
 })
-app.listen(3001,()=>{
+app.listen(5000,()=>{
     console.log("port listing http");
 })
