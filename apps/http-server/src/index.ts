@@ -1,5 +1,6 @@
 import express from "express"
-import { middleware } from "./middleware";
+import cors from "cors"
+import { middleware } from "./middleware"
 // import {CreateUserSchema,SigninSchema,CreateRoomSchema} from "@repo/common/type"
 import dotenv from "dotenv"
 dotenv.config()
@@ -10,6 +11,7 @@ import { prismaClient } from "@repo/db/client";
 
 const port = process.env.PORT
 app.use(express.json())
+app.use(cors())
 import {z} from "zod"
 
  const CreateUserSchema = z.object({
